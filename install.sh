@@ -93,6 +93,7 @@ PACMAN_PACKAGES=(
   wl-clipboard
   xdg-desktop-portal-wlr
   xdg-user-dirs
+  xorg-xwayland
   zsh
   zsh-autosuggestions
   zsh-completions
@@ -219,11 +220,19 @@ fi
 # =============================================================================
 # STEP 8 — Copy .zshrc
 # =============================================================================
-section "STEP 8: Setup .zshrc"
+section "STEP 8: Setup .zshrc dan .p10k.zsh"
 
 info "Menyalin .zshrc ke ~/..."
 cp "$SCRIPT_DIR/dotfiles/.zshrc" ~/.zshrc
 success ".zshrc berhasil disalin."
+
+info "Menyalin .p10k.zsh ke ~/..."
+if [[ -f "$SCRIPT_DIR/dotfiles/.p10k.zsh" ]]; then
+  cp "$SCRIPT_DIR/dotfiles/.p10k.zsh" ~/.p10k.zsh
+  success ".p10k.zsh berhasil disalin."
+else
+  warn ".p10k.zsh tidak ditemukan di dotfiles/, skip. Jalankan 'p10k configure' manual setelah reboot."
+fi
 
 # =============================================================================
 # STEP 9 — Set default shell ke zsh
@@ -257,6 +266,16 @@ else
   warn "Tidak ada file .sh di SilentSDDM, skip chmod."
 fi
 
+info "Menjalankan SilentSDDM install script..."
+if [[ -f ~/Projects/SilentSDDM/install.sh ]]; then
+  cd ~/Projects/SilentSDDM
+  bash install.sh
+  cd "$SCRIPT_DIR"
+  success "SilentSDDM berhasil diinstall."
+else
+  warn "install.sh tidak ditemukan di SilentSDDM, skip install."
+fi
+
 # =============================================================================
 # SELESAI
 # =============================================================================
@@ -265,8 +284,8 @@ echo -e "${GREEN}${BOLD}╔═════════════════�
 echo -e "${GREEN}${BOLD}║       INSTALASI SELESAI! 🎉              ║${RESET}"
 echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════╝${RESET}"
 echo ""
-echo -e "  ${BOLD}Yang perlu dilakukan manual setelah ini:${RESET}"
-echo -e "  ${YELLOW}1.${RESET} Re-login atau reboot"
-echo -e "  ${YELLOW}2.${RESET} Buka terminal, ketik: ${BOLD}p10k configure${RESET}"
-echo -e "  ${YELLOW}3.${RESET} Setup SilentSDDM: ${BOLD}cd ~/Projects/SilentSDDM && ./install.sh${RESET} (sesuaikan nama scriptnya)"
+echo -e "  ${YELLOW}System akan reboot dalam 5 detik...${RESET}"
+echo -e "  ${YELLOW}Tekan Ctrl+C untuk membatalkan reboot.${RESET}"
 echo ""
+sleep 5
+sudo reboot
