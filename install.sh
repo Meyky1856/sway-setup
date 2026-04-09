@@ -83,6 +83,7 @@ PACMAN_PACKAGES=(
   swappy
   swayidle
   swaylock
+  ttf-cascadia-code
   ttf-font-awesome
   ttf-jetbrains-mono-nerd
   thunderbird
@@ -167,6 +168,7 @@ AUR_PACKAGES=(
   swayfx
   android-studio
   gimgv
+  ttf-ms-fonts
 )
 
 FAILED_PACKAGES=()
