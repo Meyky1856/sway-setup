@@ -1,0 +1,15 @@
+#
+# ▀█▀ █░█ █▀▀ █▀▄▀█ █▀▀
+# ░█░ █▀█ ██▄ █░▀░█ ██▄
+# ==========================================================
+
+# --- BORDERS & GAPS ---
+gaps inner 6
+gaps outer 0
+smart_gaps off
+
+default_border pixel 2
+default_floating_border pixel 2
+
+# --- CURSOR ---
+seat seat0 xcursor_theme Vimix-cursors 30

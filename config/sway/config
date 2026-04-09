@@ -1,0 +1,36 @@
+#
+#   ██████  ██     ██  ██████  ██    ██
+#  ██       ██     ██  ██  ██   ██  ██
+#   ██████  ██  █  ██  ██████    ████
+#       ██  ██ ███ ██  ██  ██     ██
+#   ██████   ███ ███   ██  ██     ██
+#
+# ==========================================================
+#  SWAY MAIN CONFIGURATION
+# ==========================================================
+
+# 1. VARIABLES
+# Defines modifier keys, terminal, and default menu.
+include ~/.config/sway/config.d/variables
+
+# 2. HARDWARE CONFIGURATION
+# Monitor outputs, workspace assignments, and input devices.
+include ~/.config/sway/config.d/outputs
+include ~/.config/sway/config.d/inputs
+
+# 3. VISUAL & THEME
+# Gaps, borders, fonts, colors, and UI styling.
+include ~/.config/sway/config.d/theme
+
+# 4. KEYBINDINGS
+# Keyboard shortcuts (Applications, System, Controls).
+include ~/.config/sway/config.d/keybindings
+
+# 5. AUTOSTART & IDLE
+# Background services, daemons, and idle management.
+include ~/.config/sway/config.d/autostart
+
+# ==========================================================
+# SYSTEM DEFAULTS
+# Load default distribution configs (if any).
+include /etc/sway/config.d/*

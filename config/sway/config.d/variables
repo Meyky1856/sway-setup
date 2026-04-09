@@ -1,0 +1,15 @@
+# Logo key
+set $mod Mod4
+
+# Direction keys (Vim-style)
+set $left h
+set $down j
+set $up k
+set $right l
+
+# Preferred Applications
+set $browser1 zen-browser
+set $browser2 brave
+set $browser3 librewolf
+set $term alacritty
+set $menu rofi -show drun

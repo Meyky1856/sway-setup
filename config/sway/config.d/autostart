@@ -1,0 +1,30 @@
+# ▄▀█ █░█ ▀█▀ █▀█ █▀ ▀█▀ ▄▀█ █▀█ ▀█▀
+# █▀█ █▄█ ░█░ █▄█ ▄█ ░█░ █▀█ █▀▄ ░█░
+# ==========================================================
+
+# --- SYSTEM TRAY & BAR ---
+# Restore wallpaper & Waybar position
+exec_always ~/.config/sway/scripts/toggle-wallpaper.sh restore
+exec_always ~/.config/sway/scripts/waybar-startup.sh
+
+# Restore Theme (Dark/Light) - Pastikan script toggle-theme.sh sudah ada
+#exec ~/.config/sway/scripts/toggle-theme.sh restore
+
+# --- WORKSPACE MANAGEMENT ---
+# Jalankan Workspace Manager dalam mode Watcher (Background)
+exec_always ~/.config/sway/scripts/workspace-manager.sh watch &
+
+# Autotiling script (Switch between split v/h automatically)
+exec autotiling
+
+# --- CLIPBOARD MANAGER ---
+exec wl-paste --type text --watch cliphist store
+exec wl-paste --type image --watch cliphist store
+
+# --- IDLE & POWER MANAGEMENT ---
+# Lock screen after 300s, turn off screen after 330s.
+exec_always pkill swayidle; swayidle -w \
+    timeout 300 'swaylock -f -c 000000' \
+    timeout 330 'swaymsg "output * power off"' \
+    resume 'swaymsg "output * power on"' \
+    before-sleep 'swaylock -f -c 000000'

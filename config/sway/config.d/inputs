@@ -1,0 +1,19 @@
+#
+# █ █▄░█ █▀█ █░█ ▀█▀ █▀
+# █ █░▀█ █▀▀ █▄█ ░█░ ▄█
+# ==========================================================
+
+# --- TOUCHPAD ---
+input "2:7:SynPS/2_Synaptics_TouchPad" {
+    dwt enabled                 # Disable While Typing
+    tap enabled                 # Tap to click
+    natural_scroll enabled      # Natural scrolling (Mobile style)
+    middle_emulation enabled
+    accel_profile "adaptive"    # Mouse acceleration profile
+    pointer_accel 0.3           # Cursor speed (-1.0 to 1.0)
+}
+
+# --- KEYBOARD ---
+input type:keyboard {
+    xkb_layout "eu"
+}

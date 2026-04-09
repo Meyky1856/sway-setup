@@ -1,0 +1,10 @@
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore sensitive files
+*.log
+*.bak
+
+# Keep empty folders via .gitkeep
+!.gitkeep
