@@ -135,9 +135,24 @@ else
 fi
 
 # =============================================================================
-# STEP 4 — Install AUR packages via yay (--answerdiff None --answerclean None)
+# STEP 4 — Install AUR packages via yay
 # =============================================================================
 section "STEP 4: Install AUR Packages"
+
+# Helper: auto import missing PGP key
+import_missing_pgp_key() {
+  local output="$1"
+  local key_id
+  key_id=$(echo "$output" | grep -oP '(?<=key |NO_PUBKEY )[0-9A-Fa-f]{8,}' | tail -n1)
+  if [[ -n "$key_id" ]]; then
+    warn "PGP key tidak ditemukan: $key_id — mencoba import otomatis..."
+    gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "$key_id" 2>/dev/null || \
+    gpg --keyserver hkps://keys.openpgp.org --recv-keys "$key_id" 2>/dev/null || \
+    gpg --keyserver hkps://pgp.mit.edu --recv-keys "$key_id" 2>/dev/null
+    return 0
+  fi
+  return 1
+}
 
 AUR_PACKAGES=(
   zen-browser-bin
@@ -154,11 +169,43 @@ AUR_PACKAGES=(
   gimgv
 )
 
+FAILED_PACKAGES=()
+
 info "Menginstall ${#AUR_PACKAGES[@]} paket AUR..."
-yay -S --noconfirm --needed --answerdiff None --answerclean None "${AUR_PACKAGES[@]}"
+for pkg in "${AUR_PACKAGES[@]}"; do
+  info "Installing: $pkg"
+  install_output=$(yay -S --noconfirm --needed --answerdiff None --answerclean None "$pkg" 2>&1)
+  install_status=$?
 
-success "AUR packages selesai diinstall."
+  if [[ $install_status -ne 0 ]]; then
+    if echo "$install_output" | grep -qiE "pgp|gpg|signature|key"; then
+      import_missing_pgp_key "$install_output"
+      info "Retry install: $pkg setelah import PGP key..."
+      if yay -S --noconfirm --needed --answerdiff None --answerclean None "$pkg"; then
+        success "$pkg berhasil diinstall setelah import PGP key."
+      else
+        warn "$pkg gagal diinstall bahkan setelah import PGP key."
+        FAILED_PACKAGES+=("$pkg")
+      fi
+    else
+      warn "$pkg gagal diinstall (bukan masalah PGP)."
+      FAILED_PACKAGES+=("$pkg")
+    fi
+  else
+    success "$pkg berhasil diinstall."
+  fi
+done
 
+if [[ ${#FAILED_PACKAGES[@]} -gt 0 ]]; then
+  echo ""
+  warn "Package berikut gagal dan perlu diinstall manual:"
+  for pkg in "${FAILED_PACKAGES[@]}"; do
+    echo -e "  ${RED}✗${RESET} $pkg"
+  done
+  echo ""
+else
+  success "Semua AUR packages selesai diinstall."
+fi
 # =============================================================================
 # STEP 5 — Copy config files ke ~/.config
 # =============================================================================
