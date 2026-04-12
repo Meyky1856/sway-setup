@@ -73,6 +73,13 @@ PACMAN_PACKAGES=(
   proton-vpn-gtk-app
   python
   python-pip
+  qemu-desktop
+  libvirt
+  virt-manager
+  virt-viewer
+  dnsmasq
+  bridge-utils
+  edk2-ovmf
   qbittorrent
   qt5-wayland
   qt6-wayland
@@ -110,17 +117,35 @@ sudo pacman -S --noconfirm --needed "${PACMAN_PACKAGES[@]}"
 success "Pacman packages selesai diinstall."
 
 # =============================================================================
-# STEP 2 — Enable SDDM
+# STEP 2 — Enable Services
 # =============================================================================
-section "STEP 2: Enable SDDM Service"
+section "STEP 2: Enable Services"
 
 sudo systemctl enable sddm.service
 success "sddm.service diaktifkan."
 
 # =============================================================================
-# STEP 3 — Install yay (AUR helper)
+# STEP 3 — Enable QEMU / Libvirt
 # =============================================================================
-section "STEP 3: Install yay"
+section "STEP 3: Enable QEMU & Libvirt"
+
+info "Mengaktifkan libvirtd.service..."
+sudo systemctl enable --now libvirtd.service
+success "libvirtd.service diaktifkan."
+
+info "Mengaktifkan default virtual network..."
+sudo virsh net-autostart default 2>/dev/null || true
+sudo virsh net-start default 2>/dev/null || true
+
+info "Menambahkan user ke group libvirt dan kvm..."
+sudo usermod -aG libvirt,kvm "$USER"
+success "User $USER ditambahkan ke group libvirt dan kvm."
+info "Perubahan group akan efektif setelah reboot."
+
+# =============================================================================
+# STEP 4 — Install yay (AUR helper)
+# =============================================================================
+section "STEP 4: Install yay"
 
 if command -v yay &>/dev/null; then
   info "yay sudah terinstall, skip."
@@ -136,9 +161,9 @@ else
 fi
 
 # =============================================================================
-# STEP 4 — Install AUR packages via yay
+# STEP 5 — Install AUR packages via yay
 # =============================================================================
-section "STEP 4: Install AUR Packages"
+section "STEP 5: Install AUR Packages"
 
 # Helper: auto import missing PGP key
 import_missing_pgp_key() {
@@ -209,9 +234,9 @@ else
   success "Semua AUR packages selesai diinstall."
 fi
 # =============================================================================
-# STEP 5 — Copy config files ke ~/.config
+# STEP 6 — Copy config files ke ~/.config
 # =============================================================================
-section "STEP 5: Copy Config ke ~/.config"
+section "STEP 6: Copy Config ke ~/.config"
 
 info "Menyalin config/alacritty ke ~/.config/alacritty..."
 mkdir -p ~/.config/alacritty
@@ -232,9 +257,24 @@ fi
 success "Config files berhasil disalin."
 
 # =============================================================================
-# STEP 6 — Install Rofi themes
+# STEP 7 — Setup NvChad
 # =============================================================================
-section "STEP 6: Install Rofi Themes"
+section "STEP 7: Setup NvChad"
+
+info "Menghapus config nvim lama jika ada..."
+rm -rf ~/.config/nvim
+rm -rf ~/.local/share/nvim
+rm -rf ~/.cache/nvim
+
+info "Mengclone NvChad starter ke ~/.config/nvim..."
+git clone --depth=1 https://github.com/NvChad/starter ~/.config/nvim
+success "NvChad starter berhasil diclone."
+info "NvChad akan auto-install semua plugin saat pertama kali kamu buka nvim."
+
+# =============================================================================
+# STEP 8 — Install Rofi themes
+# =============================================================================
+section "STEP 8: Install Rofi Themes"
 
 TMPDIR=$(mktemp -d)
 info "Mengclone adi1090x/rofi..."
@@ -252,9 +292,9 @@ ln -sf ~/.config/rofi/powermenu/type-1/powermenu.sh ~/.config/rofi/powermenu_act
 success "Symlink rofi berhasil dibuat."
 
 # =============================================================================
-# STEP 7 — Setup Powerlevel10k
+# STEP 9 — Setup Powerlevel10k
 # =============================================================================
-section "STEP 7: Setup Powerlevel10k"
+section "STEP 9: Setup Powerlevel10k"
 
 if [[ -d "$SCRIPT_DIR/powerlevel10k" && "$(ls -A "$SCRIPT_DIR/powerlevel10k" | grep -v '.gitkeep')" ]]; then
   info "Menyalin powerlevel10k dari repo ke ~/powerlevel10k..."
@@ -267,9 +307,9 @@ else
 fi
 
 # =============================================================================
-# STEP 8 — Copy .zshrc
+# STEP 10 — Copy .zshrc
 # =============================================================================
-section "STEP 8: Setup .zshrc dan .p10k.zsh"
+section "STEP 10: Setup .zshrc dan .p10k.zsh"
 
 info "Menyalin .zshrc ke ~/..."
 cp "$SCRIPT_DIR/dotfiles/.zshrc" ~/.zshrc
@@ -284,9 +324,9 @@ else
 fi
 
 # =============================================================================
-# STEP 9 — Set default shell ke zsh
+# STEP 11 — Set default shell ke zsh
 # =============================================================================
-section "STEP 9: Set Default Shell ke ZSH"
+section "STEP 11: Set Default Shell ke ZSH"
 
 if [[ "$SHELL" != "$(which zsh)" ]]; then
   info "Mengubah default shell ke zsh..."
@@ -297,9 +337,9 @@ else
 fi
 
 # =============================================================================
-# STEP 10 — Setup Projects/SilentSDDM
+# STEP 12 — Setup Projects/SilentSDDM
 # =============================================================================
-section "STEP 10: Setup Projects/SilentSDDM"
+section "STEP 12: Setup Projects/SilentSDDM"
 
 info "Membuat folder ~/Projects..."
 mkdir -p ~/Projects
