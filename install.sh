@@ -78,7 +78,6 @@ PACMAN_PACKAGES=(
   virt-manager
   virt-viewer
   dnsmasq
-  bridge-utils
   edk2-ovmf
   qbittorrent
   qt5-wayland
