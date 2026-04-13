@@ -31,6 +31,55 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # =============================================================================
+# PRE-CHECK — Fix DNS sebelum mulai
+# =============================================================================
+section "PRE-CHECK: Memastikan Koneksi Internet"
+
+info "Mengatur DNS ke Google & Cloudflare..."
+sudo tee /etc/resolv.conf > /dev/null << 'EOF'
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+nameserver 1.1.1.1
+EOF
+
+# Cegah NetworkManager override resolv.conf
+sudo chattr +i /etc/resolv.conf 2>/dev/null || true
+
+info "Menunggu DNS aktif..."
+sleep 2
+
+# Test koneksi
+MAX_RETRY=5
+ATTEMPT=0
+CONNECTED=false
+
+while [[ $ATTEMPT -lt $MAX_RETRY ]]; do
+  ATTEMPT=$((ATTEMPT + 1))
+  if ping -c 1 -W 3 8.8.8.8 &>/dev/null; then
+    CONNECTED=true
+    break
+  fi
+  warn "Koneksi belum tersedia, mencoba lagi... ($ATTEMPT/$MAX_RETRY)"
+  sleep 5
+done
+
+if [[ "$CONNECTED" == false ]]; then
+  error "Tidak ada koneksi internet setelah $MAX_RETRY percobaan. Pastikan kamu sudah terhubung ke internet."
+fi
+
+# Test DNS resolve
+if ! ping -c 1 -W 3 github.com &>/dev/null; then
+  warn "DNS masih bermasalah, mencoba flush DNS..."
+  sudo systemctl restart systemd-resolved 2>/dev/null || true
+  sleep 3
+  if ! ping -c 1 -W 3 github.com &>/dev/null; then
+    error "Tidak bisa resolve github.com. Cek koneksi internet kamu."
+  fi
+fi
+
+success "Koneksi internet OK, DNS berjalan normal."
+
+# =============================================================================
 # STEP 1 — Install pacman packages
 # =============================================================================
 section "STEP 1: Install Pacman Packages"
@@ -118,17 +167,47 @@ success "sddm.service diaktifkan."
 # =============================================================================
 section "STEP 3: Install yay"
 
+# Set curl retry di makepkg.conf agar download tidak mudah gagal
+info "Mengatur curl retry di makepkg.conf..."
+sudo sed -i 's|^DLAGENTS=.*|DLAGENTS=("file::/usr/bin/curl -qgC - -o %o %u" "ftp::/usr/bin/curl -qgfC - --retry 5 --retry-delay 5 -o %o %u" "http::/usr/bin/curl -qgb "" -fLC - --retry 5 --retry-delay 5 -o %o %u" "https::/usr/bin/curl -qgb "" -fLC - --retry 5 --retry-delay 5 -o %o %u" "rsync::/usr/bin/rsync --no-motd -z %u %o" "scp::/usr/bin/scp -C %u %o")|' /etc/makepkg.conf
+success "curl retry diatur ke 5x dengan delay 5 detik."
+
 if command -v yay &>/dev/null; then
   info "yay sudah terinstall, skip."
 else
   info "Menginstall yay dari AUR..."
-  TMPDIR=$(mktemp -d)
-  git clone --depth=1 https://aur.archlinux.org/yay.git "$TMPDIR/yay"
-  cd "$TMPDIR/yay"
-  makepkg -si --noconfirm
-  cd "$SCRIPT_DIR"
-  rm -rf "$TMPDIR"
-  success "yay berhasil diinstall."
+  MAX_RETRY=3
+  ATTEMPT=0
+  YAY_SUCCESS=false
+
+  while [[ $ATTEMPT -lt $MAX_RETRY ]]; do
+    ATTEMPT=$((ATTEMPT + 1))
+    info "Percobaan ke-$ATTEMPT dari $MAX_RETRY..."
+
+    TMPDIR=$(mktemp -d)
+    if git clone --depth=1 https://aur.archlinux.org/yay.git "$TMPDIR/yay"; then
+      cd "$TMPDIR/yay"
+      if makepkg -si --noconfirm; then
+        cd "$SCRIPT_DIR"
+        rm -rf "$TMPDIR"
+        success "yay berhasil diinstall."
+        YAY_SUCCESS=true
+        break
+      else
+        warn "makepkg gagal, mencoba ulang..."
+        cd "$SCRIPT_DIR"
+        rm -rf "$TMPDIR"
+      fi
+    else
+      warn "git clone gagal, mencoba ulang dalam 5 detik..."
+      rm -rf "$TMPDIR"
+      sleep 5
+    fi
+  done
+
+  if [[ "$YAY_SUCCESS" == false ]]; then
+    error "yay gagal diinstall setelah $MAX_RETRY percobaan. Cek koneksi internet kamu."
+  fi
 fi
 
 # =============================================================================
