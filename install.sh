@@ -161,8 +161,9 @@ PACMAN_PACKAGES=(
   zsh-syntax-highlighting
 )
 
-info "Mengupdate database pacman..."
-sudo pacman -Sy --noconfirm
+info "Mengupdate database pacman (Full Upgrade)..."
+# Di Arch Linux, wajib menggunakan -Syu untuk menghindari Partial Upgrade yang merusak sistem
+sudo pacman -Syu --noconfirm
 
 info "Menginstall ${#PACMAN_PACKAGES[@]} paket pacman..."
 sudo pacman -S --noconfirm --needed "${PACMAN_PACKAGES[@]}"
@@ -200,10 +201,15 @@ info "Perubahan group akan efektif setelah reboot."
 # =============================================================================
 section "STEP 4: Install yay"
 
-# Set curl retry di makepkg.conf agar download tidak mudah gagal
+# Set curl retry di makepkg.conf secara aman tanpa merusak susunan multiline
 info "Mengatur curl retry di makepkg.conf..."
-sudo sed -i 's|^DLAGENTS=.*|DLAGENTS=("file::/usr/bin/curl -qgC - -o %o %u" "ftp::/usr/bin/curl -qgfC - --retry 5 --retry-delay 5 -o %o %u" "http::/usr/bin/curl -qgb "" -fLC - --retry 5 --retry-delay 5 -o %o %u" "https::/usr/bin/curl -qgb "" -fLC - --retry 5 --retry-delay 5 -o %o %u" "rsync::/usr/bin/rsync --no-motd -z %u %o" "scp::/usr/bin/scp -C %u %o")|' /etc/makepkg.conf
-success "curl retry diatur ke 5x dengan delay 5 detik."
+if ! grep -q "--retry 5" /etc/makepkg.conf; then
+  # Mencari baris yang mengandung 'curl' dan menyelipkan opsi retry sebelum '-o'
+  sudo sed -i '/curl/s/-o %o %u/--retry 5 --retry-delay 5 -o %o %u/' /etc/makepkg.conf
+  success "curl retry diatur ke 5x dengan delay 5 detik."
+else
+  info "curl retry sudah diatur, skip."
+fi
 
 if command -v yay &>/dev/null; then
   info "yay sudah terinstall, skip."
@@ -316,6 +322,7 @@ if [[ ${#FAILED_PACKAGES[@]} -gt 0 ]]; then
 else
   success "Semua AUR packages selesai diinstall."
 fi
+
 # =============================================================================
 # STEP 6 — Copy config files ke ~/.config
 # =============================================================================
@@ -323,25 +330,26 @@ section "STEP 6: Copy Config ke ~/.config"
 
 info "Menyalin config/alacritty ke ~/.config/alacritty..."
 mkdir -p ~/.config/alacritty
-cp -r "$SCRIPT_DIR/config/alacritty/." ~/.config/alacritty/
+cp -r "$SCRIPT_DIR/config/alacritty/." ~/.config/alacritty/ 2>/dev/null || true
 
 info "Menyalin config/dunst ke ~/.config/dunst..."
 mkdir -p ~/.config/dunst
-cp -r "$SCRIPT_DIR/config/dunst/." ~/.config/dunst/
+cp -r "$SCRIPT_DIR/config/dunst/." ~/.config/dunst/ 2>/dev/null || true
 
-  info "Menyalin config/sway ke ~/.config/sway..."
+info "Menyalin config/sway ke ~/.config/sway..."
 mkdir -p ~/.config/sway
-cp -r "$SCRIPT_DIR/config/sway/." ~/.config/sway/
+cp -r "$SCRIPT_DIR/config/sway/." ~/.config/sway/ 2>/dev/null || true
 
 info "Memberikan permission chmod +x pada ~/.config/sway/scripts/..."
 if [[ -d ~/.config/sway/scripts ]]; then
-  chmod +x ~/.config/sway/scripts/*
+  chmod +x ~/.config/sway/scripts/* 2>/dev/null || true
   success "chmod +x selesai pada sway/scripts."
 else
   warn "Folder ~/.config/sway/scripts tidak ditemukan, skip chmod."
 fi
 
 success "Config files berhasil disalin."
+
 info "Memperbaiki desktop entry scrcpy..."
 # Hapus entry duplikat scrcpy-audio jika ada
 if [[ -f /usr/share/applications/scrcpy-audiofwd.desktop ]]; then
@@ -416,7 +424,7 @@ success "Symlink rofi berhasil dibuat."
 # =============================================================================
 section "STEP 9: Setup Powerlevel10k"
 
-if [[ -d "$SCRIPT_DIR/powerlevel10k" && "$(ls -A "$SCRIPT_DIR/powerlevel10k" | grep -v '.gitkeep')" ]]; then
+if [[ -d "$SCRIPT_DIR/powerlevel10k" && "$(ls -A "$SCRIPT_DIR/powerlevel10k" 2>/dev/null | grep -v '.gitkeep')" ]]; then
   info "Menyalin powerlevel10k dari repo ke ~/powerlevel10k..."
   cp -r "$SCRIPT_DIR/powerlevel10k/." ~/powerlevel10k/
   success "powerlevel10k berhasil disalin."
@@ -431,9 +439,13 @@ fi
 # =============================================================================
 section "STEP 10: Setup .zshrc dan .p10k.zsh"
 
-info "Menyalin .zshrc ke ~/..."
-cp "$SCRIPT_DIR/dotfiles/.zshrc" ~/.zshrc
-success ".zshrc berhasil disalin."
+if [[ -f "$SCRIPT_DIR/dotfiles/.zshrc" ]]; then
+  info "Menyalin .zshrc ke ~/..."
+  cp "$SCRIPT_DIR/dotfiles/.zshrc" ~/.zshrc
+  success ".zshrc berhasil disalin."
+else
+  warn "File .zshrc tidak ditemukan di dotfiles/, pastikan file tersebut ada."
+fi
 
 info "Menyalin .p10k.zsh ke ~/..."
 if [[ -f "$SCRIPT_DIR/dotfiles/.p10k.zsh" ]]; then
@@ -464,25 +476,29 @@ section "STEP 12: Setup Projects/SilentSDDM"
 info "Membuat folder ~/Projects..."
 mkdir -p ~/Projects
 
-info "Menyalin SilentSDDM ke ~/Projects/SilentSDDM..."
-cp -r "$SCRIPT_DIR/Projects/SilentSDDM/." ~/Projects/SilentSDDM/
+if [[ -d "$SCRIPT_DIR/Projects/SilentSDDM" ]]; then
+  info "Menyalin SilentSDDM ke ~/Projects/SilentSDDM..."
+  cp -r "$SCRIPT_DIR/Projects/SilentSDDM/." ~/Projects/SilentSDDM/
 
-info "Memberikan permission chmod +x pada ~/Projects/SilentSDDM/*.sh..."
-if compgen -G ~/Projects/SilentSDDM/*.sh &>/dev/null; then
-  chmod +x ~/Projects/SilentSDDM/*.sh
-  success "chmod +x selesai pada SilentSDDM."
-else
-  warn "Tidak ada file .sh di SilentSDDM, skip chmod."
-fi
+  info "Memberikan permission chmod +x pada ~/Projects/SilentSDDM/*.sh..."
+  if compgen -G ~/Projects/SilentSDDM/*.sh &>/dev/null; then
+    chmod +x ~/Projects/SilentSDDM/*.sh
+    success "chmod +x selesai pada SilentSDDM."
+  else
+    warn "Tidak ada file .sh di SilentSDDM, skip chmod."
+  fi
 
-info "Menjalankan SilentSDDM install script..."
-if [[ -f ~/Projects/SilentSDDM/install.sh ]]; then
-  cd ~/Projects/SilentSDDM
-  bash install.sh
-  cd "$SCRIPT_DIR"
-  success "SilentSDDM berhasil diinstall."
+  info "Menjalankan SilentSDDM install script..."
+  if [[ -f ~/Projects/SilentSDDM/install.sh ]]; then
+    cd ~/Projects/SilentSDDM
+    bash install.sh
+    cd "$SCRIPT_DIR"
+    success "SilentSDDM berhasil diinstall."
+  else
+    warn "install.sh tidak ditemukan di SilentSDDM, skip install."
+  fi
 else
-  warn "install.sh tidak ditemukan di SilentSDDM, skip install."
+  warn "Folder $SCRIPT_DIR/Projects/SilentSDDM tidak ditemukan, skip langkah ini."
 fi
 
 # =============================================================================
