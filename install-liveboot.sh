@@ -127,6 +127,7 @@ PACMAN_PACKAGES=(
   qt6-wayland
   rofi-wayland
   sddm
+  scrcpy
   slurp
   swappy
   swayidle
@@ -307,6 +308,23 @@ else
 fi
 
 success "Config files berhasil disalin."
+info "Memperbaiki desktop entry scrcpy..."
+# Hapus entry duplikat scrcpy-audio jika ada
+if [[ -f /usr/share/applications/scrcpy-audiofwd.desktop ]]; then
+  sudo rm -f /usr/share/applications/scrcpy-audiofwd.desktop
+  success "Entry duplikat scrcpy-audiofwd dihapus."
+fi
+
+# Set icon untuk scrcpy
+if [[ -f /usr/share/applications/scrcpy.desktop ]]; then
+  sudo sed -i 's|^Icon=.*|Icon=phone|' /usr/share/applications/scrcpy.desktop
+  # Jika belum ada baris Icon sama sekali, tambahkan
+  if ! grep -q "^Icon=" /usr/share/applications/scrcpy.desktop; then
+    sudo sed -i '/^Exec=/a Icon=phone' /usr/share/applications/scrcpy.desktop
+  fi
+  success "Icon scrcpy berhasil diset."
+fi
+
 
 # =============================================================================
 # STEP 6 — Setup NvChad
