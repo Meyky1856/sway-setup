@@ -84,6 +84,12 @@ success "Koneksi internet OK, DNS berjalan normal."
 # =============================================================================
 section "STEP 1: Install Pacman Packages"
 
+info "Memperbarui mirrorlist ke server tercepat (Reflector)..."
+sudo reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist 2>/dev/null || warn "Gagal menjalankan reflector, menggunakan mirror bawaan."
+
+info "Memperbarui archlinux-keyring untuk mencegah error signature PGP..."
+sudo pacman -Sy --noconfirm archlinux-keyring
+
 PACMAN_PACKAGES=(
   adwaita-icon-theme
   alacritty
