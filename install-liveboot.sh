@@ -109,6 +109,9 @@ PACMAN_PACKAGES=(
   micro
   mpv
   neovim
+  nodejs
+  npm
+  clang
   noto-fonts
   noto-fonts-cjk
   noto-fonts-emoji
@@ -133,6 +136,7 @@ PACMAN_PACKAGES=(
   ttf-jetbrains-mono-nerd
   unzip
   vimix-cursors
+  vivid
   wget
   wireplumber
   wl-clipboard
@@ -286,7 +290,11 @@ info "Menyalin config/alacritty ke ~/.config/alacritty..."
 mkdir -p ~/.config/alacritty
 cp -r "$SCRIPT_DIR/config/alacritty/." ~/.config/alacritty/
 
-info "Menyalin config/sway ke ~/.config/sway..."
+info "Menyalin config/dunst ke ~/.config/dunst..."
+mkdir -p ~/.config/dunst
+cp -r "$SCRIPT_DIR/config/dunst/." ~/.config/dunst/
+
+  info "Menyalin config/sway ke ~/.config/sway..."
 mkdir -p ~/.config/sway
 cp -r "$SCRIPT_DIR/config/sway/." ~/.config/sway/
 
@@ -313,7 +321,23 @@ rm -rf ~/.cache/nvim
 info "Mengclone NvChad starter ke ~/.config/nvim..."
 git clone --depth=1 https://github.com/NvChad/starter ~/.config/nvim
 success "NvChad starter berhasil diclone."
+info "Mengatur tema NvChad ke horizon..."
+mkdir -p ~/.config/nvim/lua
+cat > ~/.config/nvim/lua/chadrc.lua << 'LUAEOF'
+---@type ChadrcConfig
+local M = {}
+M.ui = {
+  theme = "horizon",
+}
+return M
+LUAEOF
+success "Tema horizon berhasil diatur."
 info "NvChad akan auto-install semua plugin saat pertama kali kamu buka nvim."
+
+info "Menginstall LSP tools via npm: prettier dan pyright..."
+sudo npm install -g prettier pyright
+success "prettier dan pyright berhasil diinstall."
+info "clangd sudah tersedia dari package clang."
 
 # =============================================================================
 # STEP 7 — Install Rofi themes

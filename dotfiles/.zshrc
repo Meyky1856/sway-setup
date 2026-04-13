@@ -23,11 +23,14 @@ autoload -Uz compinit && compinit
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 
+# ─── Colors (vivid) ──────────────────────────────────────
+export LS_COLORS="$(vivid generate solarized-dark)"
+
 # ─── Alias ───────────────────────────────────────────────
-alias ls='eza --icons'
-alias ll='eza -lah --icons'
-alias la='eza -a --icons'
-alias lt='eza --tree --icons'
+alias ls='eza --icons --color=always'
+alias ll='eza -lah --icons --color=always'
+alias la='eza -a --icons --color=always'
+alias lt='eza --tree --icons --color=always'
 alias grep='grep --color=auto'
 alias ..='cd ..'
 alias ...='cd ../..'
