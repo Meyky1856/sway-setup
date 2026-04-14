@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # arch-setup/install-liveboot.sh
-# Automated Arch Linux Live Boot setup script (lightweight)
+# Automated Arch Linux Live Boot setup script (lightweight & optimized)
 # =============================================================================
 
 set -e  # Exit immediately on error
@@ -33,7 +33,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # =============================================================================
 # PRE-CHECK — Fix DNS sebelum mulai
 # =============================================================================
-section "PRE-CHECK: Memastikan Koneksi Internet"
+section "PRE-CHECK: Memastikan Koneksi Internet & Waktu"
+
+info "Menyelaraskan waktu sistem (menghindari error SSL/Sertifikat)..."
+sudo timedatectl set-ntp true
+sleep 3
 
 info "Mengatur DNS ke Google & Cloudflare..."
 sudo tee /etc/resolv.conf > /dev/null << 'EOF'
@@ -42,11 +46,10 @@ nameserver 8.8.4.4
 nameserver 1.1.1.1
 EOF
 
-# Cegah NetworkManager override resolv.conf
 sudo chattr +i /etc/resolv.conf 2>/dev/null || true
 
-info "Menunggu DNS aktif..."
-sleep 2
+info "Menunggu interface jaringan stabil..."
+sleep 4
 
 # Test koneksi
 MAX_RETRY=5
@@ -64,7 +67,7 @@ while [[ $ATTEMPT -lt $MAX_RETRY ]]; do
 done
 
 if [[ "$CONNECTED" == false ]]; then
-  error "Tidak ada koneksi internet setelah $MAX_RETRY percobaan. Pastikan kamu sudah terhubung ke internet."
+  error "Tidak ada koneksi internet setelah $MAX_RETRY percobaan. Pastikan kabel LAN atau Wi-Fi terhubung."
 fi
 
 # Test DNS resolve
@@ -157,7 +160,6 @@ PACMAN_PACKAGES=(
 )
 
 info "Mengupdate database pacman (Full Upgrade)..."
-# Diubah ke -Syu untuk menghindari isu dependencies rusak
 sudo pacman -Syu --noconfirm
 
 info "Menginstall ${#PACMAN_PACKAGES[@]} paket pacman..."
@@ -175,23 +177,22 @@ success "sddm.service diaktifkan."
 
 
 # =============================================================================
-# STEP 3 — Install yay (AUR helper)
+# STEP 3 — Install yay-bin (AUR helper - Precompiled)
 # =============================================================================
-section "STEP 3: Install yay"
+section "STEP 3: Install yay-bin"
+info "Menggunakan yay-bin (precompiled) agar menghindari error build Golang di Live Boot."
 
 # Set curl retry di makepkg.conf secara aman
 info "Mengatur curl retry di makepkg.conf..."
 if ! grep -q "--retry 5" /etc/makepkg.conf; then
   sudo sed -i '/curl/s/-o %o %u/--retry 5 --retry-delay 5 -o %o %u/' /etc/makepkg.conf
   success "curl retry diatur ke 5x dengan delay 5 detik."
-else
-  info "curl retry sudah diatur, skip."
 fi
 
 if command -v yay &>/dev/null; then
   info "yay sudah terinstall, skip."
 else
-  info "Menginstall yay dari AUR..."
+  info "Menginstall yay-bin dari AUR..."
   MAX_RETRY=3
   ATTEMPT=0
   YAY_SUCCESS=false
@@ -201,12 +202,13 @@ else
     info "Percobaan ke-$ATTEMPT dari $MAX_RETRY..."
 
     TMPDIR=$(mktemp -d)
-    if git clone --depth=1 https://aur.archlinux.org/yay.git "$TMPDIR/yay"; then
-      cd "$TMPDIR/yay"
+    # GANTI KE YAY-BIN AGAR TIDAK PERLU COMPILE GOLANG
+    if git clone --depth=1 https://aur.archlinux.org/yay-bin.git "$TMPDIR/yay-bin"; then
+      cd "$TMPDIR/yay-bin"
       if makepkg -si --noconfirm; then
         cd "$SCRIPT_DIR"
         rm -rf "$TMPDIR"
-        success "yay berhasil diinstall."
+        success "yay-bin berhasil diinstall."
         YAY_SUCCESS=true
         break
       else
@@ -293,8 +295,9 @@ if [[ ${#FAILED_PACKAGES[@]} -gt 0 ]]; then
 else
   success "Semua AUR packages selesai diinstall."
 fi
+
 # =============================================================================
-# STEP 5 — Copy config files ke ~/.config
+# STEP 5 — Copy config files & Setup Dunst
 # =============================================================================
 section "STEP 5: Copy Config ke ~/.config"
 
@@ -302,9 +305,16 @@ info "Menyalin config/alacritty ke ~/.config/alacritty..."
 mkdir -p ~/.config/alacritty
 cp -r "$SCRIPT_DIR/config/alacritty/." ~/.config/alacritty/ 2>/dev/null || true
 
-info "Menyalin config/dunst ke ~/.config/dunst..."
+info "Membuat konfigurasi Dunst di ~/.config/dunst/dunstrc..."
 mkdir -p ~/.config/dunst
-cp -r "$SCRIPT_DIR/config/dunst/." ~/.config/dunst/ 2>/dev/null || true
+cat > ~/.config/dunst/dunstrc << 'EOF'
+# ~/.config/dunst/dunstrc
+
+[global]
+    origin = top-right
+    offset = 6x6
+EOF
+success "Konfigurasi Dunst berhasil dibuat."
 
 info "Menyalin config/sway ke ~/.config/sway..."
 mkdir -p ~/.config/sway
@@ -321,27 +331,95 @@ fi
 success "Config files berhasil disalin."
 
 info "Memperbaiki desktop entry scrcpy..."
-# Hapus entry duplikat scrcpy-audio jika ada
 if [[ -f /usr/share/applications/scrcpy-audiofwd.desktop ]]; then
   sudo rm -f /usr/share/applications/scrcpy-audiofwd.desktop
   success "Entry duplikat scrcpy-audiofwd dihapus."
 fi
 
-# Set icon untuk scrcpy
 if [[ -f /usr/share/applications/scrcpy.desktop ]]; then
   sudo sed -i 's|^Icon=.*|Icon=phone|' /usr/share/applications/scrcpy.desktop
-  # Jika belum ada baris Icon sama sekali, tambahkan
   if ! grep -q "^Icon=" /usr/share/applications/scrcpy.desktop; then
     sudo sed -i '/^Exec=/a Icon=phone' /usr/share/applications/scrcpy.desktop
   fi
   success "Icon scrcpy berhasil diset."
 fi
 
+# =============================================================================
+# STEP 6 — Setup Konfigurasi Snapper
+# =============================================================================
+section "STEP 6: Setup Konfigurasi Snapper"
+
+info "Menulis ulang konfigurasi root Snapper..."
+sudo mkdir -p /etc/snapper/configs
+sudo tee /etc/snapper/configs/root > /dev/null << 'EOF'
+# subvolume to snapshot
+SUBVOLUME="/"
+
+# filesystem type
+FSTYPE="btrfs"
+
+
+# btrfs qgroup for space aware cleanup algorithms
+QGROUP=""
+
+
+# fraction or absolute size of the filesystems space the snapshots may use
+SPACE_LIMIT="0.5"
+
+# fraction or absolute size of the filesystems space that should be free
+FREE_LIMIT="0.2"
+
+
+# users and groups allowed to work with config
+ALLOW_USERS=""
+ALLOW_GROUPS=""
+
+# sync users and groups from ALLOW_USERS and ALLOW_GROUPS to .snapshots
+# directory
+SYNC_ACL="no"
+
+
+# start comparing pre- and post-snapshot in background after creating
+# post-snapshot
+BACKGROUND_COMPARISON="yes"
+
+
+# run daily number cleanup
+NUMBER_CLEANUP="yes"
+
+# limit for number cleanup
+NUMBER_MIN_AGE="3600"
+NUMBER_LIMIT="50"
+NUMBER_LIMIT_IMPORTANT="10"
+
+
+# create hourly snapshots
+TIMELINE_CREATE="no"
+
+# cleanup hourly snapshots after some time
+TIMELINE_CLEANUP="yes"
+
+# limits for timeline cleanup
+TIMELINE_LIMIT_HOURLY="3"
+TIMELINE_LIMIT_DAILY="5"
+TIMELINE_LIMIT_WEEKLY="2"
+TIMELINE_LIMIT_MONTHLY="1"
+TIMELINE_LIMIT_QUARTERLY="0"
+TIMELINE_LIMIT_YEARLY="0"
+
+
+# cleanup empty pre-post-pairs
+EMPTY_PRE_POST_CLEANUP="yes"
+
+# limits for empty pre-post-pair cleanup
+EMPTY_PRE_POST_MIN_AGE="3600"
+EOF
+success "Konfigurasi Snapper /etc/snapper/configs/root berhasil diperbarui."
 
 # =============================================================================
-# STEP 6 — Setup NvChad
+# STEP 7 — Setup NvChad
 # =============================================================================
-section "STEP 6: Setup NvChad"
+section "STEP 7: Setup NvChad"
 
 info "Menghapus config nvim lama jika ada..."
 rm -rf ~/.config/nvim
@@ -370,9 +448,9 @@ success "prettier dan pyright berhasil diinstall."
 info "clangd sudah tersedia dari package clang."
 
 # =============================================================================
-# STEP 7 — Install Rofi themes
+# STEP 8 — Install Rofi themes
 # =============================================================================
-section "STEP 7: Install Rofi Themes"
+section "STEP 8: Install Rofi Themes"
 
 TMPDIR=$(mktemp -d)
 info "Mengclone adi1090x/rofi..."
@@ -390,9 +468,9 @@ ln -sf ~/.config/rofi/powermenu/type-1/powermenu.sh ~/.config/rofi/powermenu_act
 success "Symlink rofi berhasil dibuat."
 
 # =============================================================================
-# STEP 8 — Setup Powerlevel10k
+# STEP 9 — Setup Powerlevel10k
 # =============================================================================
-section "STEP 8: Setup Powerlevel10k"
+section "STEP 9: Setup Powerlevel10k"
 
 if [[ -d "$SCRIPT_DIR/powerlevel10k" && "$(ls -A "$SCRIPT_DIR/powerlevel10k" 2>/dev/null | grep -v '.gitkeep')" ]]; then
   info "Menyalin powerlevel10k dari repo ke ~/powerlevel10k..."
@@ -405,9 +483,9 @@ else
 fi
 
 # =============================================================================
-# STEP 9 — Copy .zshrc
+# STEP 10 — Copy .zshrc
 # =============================================================================
-section "STEP 9: Setup .zshrc dan .p10k.zsh"
+section "STEP 10: Setup .zshrc dan .p10k.zsh"
 
 if [[ -f "$SCRIPT_DIR/dotfiles/.zshrc" ]]; then
   info "Menyalin .zshrc ke ~/..."
@@ -426,9 +504,9 @@ else
 fi
 
 # =============================================================================
-# STEP 10 — Set default shell ke zsh
+# STEP 11 — Set default shell ke zsh
 # =============================================================================
-section "STEP 10: Set Default Shell ke ZSH"
+section "STEP 11: Set Default Shell ke ZSH"
 
 if [[ "$SHELL" != "$(which zsh)" ]]; then
   info "Mengubah default shell ke zsh..."
@@ -439,9 +517,9 @@ else
 fi
 
 # =============================================================================
-# STEP 11 — Setup Projects/SilentSDDM
+# STEP 12 — Setup Projects/SilentSDDM
 # =============================================================================
-section "STEP 11: Setup Projects/SilentSDDM"
+section "STEP 12: Setup Projects/SilentSDDM"
 
 info "Membuat folder ~/Projects..."
 mkdir -p ~/Projects
