@@ -162,7 +162,6 @@ PACMAN_PACKAGES=(
 )
 
 info "Mengupdate database pacman (Full Upgrade)..."
-# Di Arch Linux, wajib menggunakan -Syu untuk menghindari Partial Upgrade yang merusak sistem
 sudo pacman -Syu --noconfirm
 
 info "Menginstall ${#PACMAN_PACKAGES[@]} paket pacman..."
@@ -201,10 +200,8 @@ info "Perubahan group akan efektif setelah reboot."
 # =============================================================================
 section "STEP 4: Install yay"
 
-# Set curl retry di makepkg.conf secara aman tanpa merusak susunan multiline
 info "Mengatur curl retry di makepkg.conf..."
 if ! grep -q "--retry 5" /etc/makepkg.conf; then
-  # Mencari baris yang mengandung 'curl' dan menyelipkan opsi retry sebelum '-o'
   sudo sed -i '/curl/s/-o %o %u/--retry 5 --retry-delay 5 -o %o %u/' /etc/makepkg.conf
   success "curl retry diatur ke 5x dengan delay 5 detik."
 else
@@ -278,7 +275,6 @@ AUR_PACKAGES=(
   wps-office
   onlyoffice-bin
   zoom
-  xclicker
   swayfx
   android-studio
   gimgv
@@ -324,7 +320,7 @@ else
 fi
 
 # =============================================================================
-# STEP 6 — Copy config files ke ~/.config
+# STEP 6 — Copy config files & Setup Dunst
 # =============================================================================
 section "STEP 6: Copy Config ke ~/.config"
 
@@ -332,9 +328,16 @@ info "Menyalin config/alacritty ke ~/.config/alacritty..."
 mkdir -p ~/.config/alacritty
 cp -r "$SCRIPT_DIR/config/alacritty/." ~/.config/alacritty/ 2>/dev/null || true
 
-info "Menyalin config/dunst ke ~/.config/dunst..."
+info "Membuat konfigurasi Dunst di ~/.config/dunst/dunstrc..."
 mkdir -p ~/.config/dunst
-cp -r "$SCRIPT_DIR/config/dunst/." ~/.config/dunst/ 2>/dev/null || true
+cat > ~/.config/dunst/dunstrc << 'EOF'
+# ~/.config/dunst/dunstrc
+
+[global]
+    origin = top-right
+    offset = 6x6
+EOF
+success "Konfigurasi Dunst berhasil dibuat."
 
 info "Menyalin config/sway ke ~/.config/sway..."
 mkdir -p ~/.config/sway
@@ -351,27 +354,95 @@ fi
 success "Config files berhasil disalin."
 
 info "Memperbaiki desktop entry scrcpy..."
-# Hapus entry duplikat scrcpy-audio jika ada
 if [[ -f /usr/share/applications/scrcpy-audiofwd.desktop ]]; then
   sudo rm -f /usr/share/applications/scrcpy-audiofwd.desktop
   success "Entry duplikat scrcpy-audiofwd dihapus."
 fi
 
-# Set icon untuk scrcpy
 if [[ -f /usr/share/applications/scrcpy.desktop ]]; then
   sudo sed -i 's|^Icon=.*|Icon=phone|' /usr/share/applications/scrcpy.desktop
-  # Jika belum ada baris Icon sama sekali, tambahkan
   if ! grep -q "^Icon=" /usr/share/applications/scrcpy.desktop; then
     sudo sed -i '/^Exec=/a Icon=phone' /usr/share/applications/scrcpy.desktop
   fi
   success "Icon scrcpy berhasil diset."
 fi
 
+# =============================================================================
+# STEP 7 — Setup Konfigurasi Snapper
+# =============================================================================
+section "STEP 7: Setup Konfigurasi Snapper"
+
+info "Menulis ulang konfigurasi root Snapper..."
+sudo mkdir -p /etc/snapper/configs
+sudo tee /etc/snapper/configs/root > /dev/null << 'EOF'
+# subvolume to snapshot
+SUBVOLUME="/"
+
+# filesystem type
+FSTYPE="btrfs"
+
+
+# btrfs qgroup for space aware cleanup algorithms
+QGROUP=""
+
+
+# fraction or absolute size of the filesystems space the snapshots may use
+SPACE_LIMIT="0.5"
+
+# fraction or absolute size of the filesystems space that should be free
+FREE_LIMIT="0.2"
+
+
+# users and groups allowed to work with config
+ALLOW_USERS=""
+ALLOW_GROUPS=""
+
+# sync users and groups from ALLOW_USERS and ALLOW_GROUPS to .snapshots
+# directory
+SYNC_ACL="no"
+
+
+# start comparing pre- and post-snapshot in background after creating
+# post-snapshot
+BACKGROUND_COMPARISON="yes"
+
+
+# run daily number cleanup
+NUMBER_CLEANUP="yes"
+
+# limit for number cleanup
+NUMBER_MIN_AGE="3600"
+NUMBER_LIMIT="50"
+NUMBER_LIMIT_IMPORTANT="10"
+
+
+# create hourly snapshots
+TIMELINE_CREATE="no"
+
+# cleanup hourly snapshots after some time
+TIMELINE_CLEANUP="yes"
+
+# limits for timeline cleanup
+TIMELINE_LIMIT_HOURLY="3"
+TIMELINE_LIMIT_DAILY="5"
+TIMELINE_LIMIT_WEEKLY="2"
+TIMELINE_LIMIT_MONTHLY="1"
+TIMELINE_LIMIT_QUARTERLY="0"
+TIMELINE_LIMIT_YEARLY="0"
+
+
+# cleanup empty pre-post-pairs
+EMPTY_PRE_POST_CLEANUP="yes"
+
+# limits for empty pre-post-pair cleanup
+EMPTY_PRE_POST_MIN_AGE="3600"
+EOF
+success "Konfigurasi Snapper /etc/snapper/configs/root berhasil diperbarui."
 
 # =============================================================================
-# STEP 7 — Setup NvChad
+# STEP 8 — Setup NvChad
 # =============================================================================
-section "STEP 7: Setup NvChad"
+section "STEP 8: Setup NvChad"
 
 info "Menghapus config nvim lama jika ada..."
 rm -rf ~/.config/nvim
@@ -400,9 +471,9 @@ success "prettier dan pyright berhasil diinstall."
 info "clangd sudah tersedia dari package clang."
 
 # =============================================================================
-# STEP 8 — Install Rofi themes
+# STEP 9 — Install Rofi themes
 # =============================================================================
-section "STEP 8: Install Rofi Themes"
+section "STEP 9: Install Rofi Themes"
 
 TMPDIR=$(mktemp -d)
 info "Mengclone adi1090x/rofi..."
@@ -420,9 +491,9 @@ ln -sf ~/.config/rofi/powermenu/type-1/powermenu.sh ~/.config/rofi/powermenu_act
 success "Symlink rofi berhasil dibuat."
 
 # =============================================================================
-# STEP 9 — Setup Powerlevel10k
+# STEP 10 — Setup Powerlevel10k
 # =============================================================================
-section "STEP 9: Setup Powerlevel10k"
+section "STEP 10: Setup Powerlevel10k"
 
 if [[ -d "$SCRIPT_DIR/powerlevel10k" && "$(ls -A "$SCRIPT_DIR/powerlevel10k" 2>/dev/null | grep -v '.gitkeep')" ]]; then
   info "Menyalin powerlevel10k dari repo ke ~/powerlevel10k..."
@@ -435,9 +506,9 @@ else
 fi
 
 # =============================================================================
-# STEP 10 — Copy .zshrc
+# STEP 11 — Copy .zshrc
 # =============================================================================
-section "STEP 10: Setup .zshrc dan .p10k.zsh"
+section "STEP 11: Setup .zshrc dan .p10k.zsh"
 
 if [[ -f "$SCRIPT_DIR/dotfiles/.zshrc" ]]; then
   info "Menyalin .zshrc ke ~/..."
@@ -456,9 +527,9 @@ else
 fi
 
 # =============================================================================
-# STEP 11 — Set default shell ke zsh
+# STEP 12 — Set default shell ke zsh
 # =============================================================================
-section "STEP 11: Set Default Shell ke ZSH"
+section "STEP 12: Set Default Shell ke ZSH"
 
 if [[ "$SHELL" != "$(which zsh)" ]]; then
   info "Mengubah default shell ke zsh..."
@@ -469,9 +540,9 @@ else
 fi
 
 # =============================================================================
-# STEP 12 — Setup Projects/SilentSDDM
+# STEP 13 — Setup Projects/SilentSDDM
 # =============================================================================
-section "STEP 12: Setup Projects/SilentSDDM"
+section "STEP 13: Setup Projects/SilentSDDM"
 
 info "Membuat folder ~/Projects..."
 mkdir -p ~/Projects
